@@ -26,8 +26,9 @@ import (
 	"path"
 	"runtime"
 
+	"github.com/gofrs/flock"
+
 	"github.com/99designs/keyring"
-	// "github.com/davecgh/go-spew/spew"
 	"github.com/synfinatic/aws-sso-cli/internal/utils"
 	"golang.org/x/term"
 )
@@ -47,6 +48,7 @@ type KeyringStore struct {
 	keyring KeyringAPI
 	config  keyring.Config
 	cache   StorageData
+	fl      *flock.Flock
 }
 
 type StorageData struct {
@@ -165,13 +167,16 @@ func OpenKeyring(cfg *keyring.Config) (*KeyringStore, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	kr := KeyringStore{
 		keyring: ring,
 		config:  *cfg,
 		cache:   NewStorageData(),
+		fl:      flock.New(FlockFile(true)),
 	}
 
-	if err = kr.getStorageData(&kr.cache); err != nil {
+	err = kr.getStorageData(&kr.cache)
+	if err != nil {
 		return nil, err
 	}
 
@@ -188,6 +193,11 @@ var storageDataUnmarshal Unmarshaler = json.Unmarshal
 
 // loads the entire StorageData into memory
 func (kr *KeyringStore) getStorageData(s *StorageData) error {
+	if err := kr.fl.Lock(); err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer kr.fl.Unlock()
+
 	var data []byte
 	var err error
 
@@ -225,7 +235,8 @@ func (kr *KeyringStore) joinAndGetKeyringData(key string) ([]byte, error) {
 	var err error
 	var chunk []byte
 
-	if chunk, err = kr.getKeyringData(fmt.Sprintf("%s_%d", key, 0)); err != nil {
+	chunk, err = kr.getKeyringData(fmt.Sprintf("%s_%d", key, 0))
+	if err != nil {
 		return nil, err
 	}
 
@@ -238,7 +249,9 @@ func (kr *KeyringStore) joinAndGetKeyringData(key string) ([]byte, error) {
 
 	for i := 1; readBytes < totalBytes; i++ {
 		k := fmt.Sprintf("%s_%d", key, i)
-		if chunk, err = kr.getKeyringData(k); err != nil {
+		chunk, err = kr.getKeyringData(k)
+
+		if err != nil {
 			return nil, fmt.Errorf("unable to fetch %s: %s", k, err.Error())
 		}
 		data = append(data, chunk...)
@@ -254,6 +267,11 @@ func (kr *KeyringStore) joinAndGetKeyringData(key string) ([]byte, error) {
 
 // saves the entire StorageData into our KeyringStore
 func (kr *KeyringStore) saveStorageData() error {
+	if err := kr.fl.Lock(); err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer kr.fl.Unlock()
+	
 	var err error
 	jdata, _ := json.Marshal(kr.cache)
 
