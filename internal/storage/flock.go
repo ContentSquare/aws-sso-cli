@@ -2,7 +2,7 @@ package storage
 
 /*
  * AWS SSO CLI
- * Copyright (c) 2021-2024 Aaron Turner  <synfinatic at gmail dot com>
+ * Copyright (c) 2021-2025 Aaron Turner  <synfinatic at gmail dot com>
  *
  * This program is free software: you can redistribute it
  * and/or modify it under the terms of the GNU General Public License as
@@ -20,13 +20,9 @@ package storage
 
 import (
 	"fmt"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/synfinatic/aws-sso-cli/internal/config"
 )
 
-func TestFlockFile(t *testing.T) {
-	cfgDir := config.ConfigDir(false)
-	assert.Equal(t, fmt.Sprintf("%s/storage.lock", cfgDir), FlockFile(false))
+func FlockFile(expand bool) string {
+	return fmt.Sprintf("%s/storage.lock", config.ConfigDir(expand))
 }

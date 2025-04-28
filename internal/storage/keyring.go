@@ -26,8 +26,10 @@ import (
 	"path"
 	"runtime"
 
+	"github.com/gofrs/flock"
+	"github.com/labstack/gommon/log"
+
 	"github.com/99designs/keyring"
-	// "github.com/davecgh/go-spew/spew"
 	"github.com/synfinatic/aws-sso-cli/internal/utils"
 	"golang.org/x/term"
 )
@@ -171,7 +173,14 @@ func OpenKeyring(cfg *keyring.Config) (*KeyringStore, error) {
 		cache:   NewStorageData(),
 	}
 
-	if err = kr.getStorageData(&kr.cache); err != nil {
+	fileLock := flock.New(FlockFile(true))
+	if err := fileLock.Lock(); err != nil {
+		return nil, fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer fileLock.Unlock()
+
+	err = kr.getStorageData(&kr.cache)
+	if err != nil {
 		return nil, err
 	}
 
@@ -190,6 +199,12 @@ var storageDataUnmarshal Unmarshaler = json.Unmarshal
 func (kr *KeyringStore) getStorageData(s *StorageData) error {
 	var data []byte
 	var err error
+
+	fileLock := flock.New(FlockFile(true))
+	if err := fileLock.Lock(); err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer fileLock.Unlock()
 
 	switch keyringGOOS {
 	case "windows":
@@ -225,7 +240,14 @@ func (kr *KeyringStore) joinAndGetKeyringData(key string) ([]byte, error) {
 	var err error
 	var chunk []byte
 
-	if chunk, err = kr.getKeyringData(fmt.Sprintf("%s_%d", key, 0)); err != nil {
+	fileLock := flock.New(FlockFile(true))
+	if err := fileLock.Lock(); err != nil {
+		return nil, fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer fileLock.Unlock()
+
+	chunk, err = kr.getKeyringData(fmt.Sprintf("%s_%d", key, 0))
+	if err != nil {
 		return nil, err
 	}
 
@@ -238,7 +260,9 @@ func (kr *KeyringStore) joinAndGetKeyringData(key string) ([]byte, error) {
 
 	for i := 1; readBytes < totalBytes; i++ {
 		k := fmt.Sprintf("%s_%d", key, i)
-		if chunk, err = kr.getKeyringData(k); err != nil {
+		chunk, err = kr.getKeyringData(k)
+
+		if err != nil {
 			return nil, fmt.Errorf("unable to fetch %s: %s", k, err.Error())
 		}
 		data = append(data, chunk...)
@@ -256,6 +280,12 @@ func (kr *KeyringStore) joinAndGetKeyringData(key string) ([]byte, error) {
 func (kr *KeyringStore) saveStorageData() error {
 	var err error
 	jdata, _ := json.Marshal(kr.cache)
+
+	fileLock := flock.New(FlockFile(true))
+	if err := fileLock.Lock(); err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer fileLock.Unlock()
 
 	switch keyringGOOS {
 	case "windows":
