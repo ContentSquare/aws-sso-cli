@@ -19,14 +19,20 @@ package storage
  */
 
 import (
-	"fmt"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/synfinatic/aws-sso-cli/internal/config"
+	"github.com/sirupsen/logrus"
 )
 
-func TestFlockFile(t *testing.T) {
-	cfgDir := config.ConfigDir(false)
-	assert.Equal(t, fmt.Sprintf("%s/storage.lock", cfgDir), FlockFile(false))
+var log *logrus.Logger
+
+func SetLogger(l *logrus.Logger) {
+	log = l
+}
+
+func GetLogger() *logrus.Logger {
+	return log
+}
+
+// this is configured by cmd/main.go, but we have this here for unit tests
+func init() {
+	log = logrus.New()
 }
