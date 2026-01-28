@@ -10,7 +10,7 @@ COPY . .
 RUN make
 
 # Stage 2: Final stage
-FROM alpine:latest
+FROM alpine:3.23.3
 
 WORKDIR /app
 # Copy the built binary from the previous stage
