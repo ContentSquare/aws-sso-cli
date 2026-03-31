@@ -3,3 +3,4 @@ mkdocs-material
 pillow
 cairosvg
 mike
+pygments>=2.20.0 # not directly required, pinned by Snyk to avoid a vulnerability
